@@ -1,0 +1,362 @@
+---
+title: "Test de hipótesis y Chi-cuadrado"
+author: " Francisca Hernández <br><a style='color:#8B475D' href='mailto:franhc123@gmail.com'>franhc123@gmail.com</a><br>"
+date: last-modified
+date-format: 'dddd DD [de] MMMM, YYYY'
+last-modified:
+title-block-banner: true
+format: 
+  html:
+    css: "files/style.css"
+    embed-resources: true
+    smooth-scroll: true
+    fontcolor: black
+    toc: true
+    toc-location: left
+    toc-title: "Contenidos"
+    toc-depth: 3
+lang: es
+---
+
+::: logo-position
+<!-- No modificar -->
+
+![](files/uah.png){width="200px"}
+:::
+
+## Que haremos ?
+
+Vamos a trabajar dos herramientas fundamentales de la estadística inferencial:
+
+-   el test de hipótesis para una muestra
+
+-   el test de Chi-cuadrado de independencia.
+
+Ambas son clave en ciencia política porque nos permiten pasar de una descripción de los datos a una afirmación con respaldo estadístico sobre la población.
+
+## Cómo lo haremos?
+
+Todos los ejemplos los vamos a resolver en R usando una base de datos real, a Encuesta Nacional de Opinión Pública CEP N° 81 (septiembre-octubre 2017), realizada por el Centro de Estudios Públicos. Esta encuesta se aplicó pocas semanas antes de la primera vuelta presidencial de 2017
+
+### Pasos a seguir
+
+1.  **Para descargar base haz click [aquí](https://static.cepchile.cl/uploads/cepchile/2022/09/encuesta_cep81_sep_oct2017.zip)**
+
+2.  Ve al archivo descargado y descomprimelo (hacer click derecho sobre el archivo y luego en la opción extraer todo)
+
+3.  lleva el archivo formato .sav a tu escritorio y fija el escritorio cómo tu directorio
+
+## Lo primero
+
+Lo primero que debemos hacer es cargar los paquetes que utilizaremos con la función `library`
+
+```{r}
+#| message: false
+#| warning: false
+
+# install.packages(c("haven", "dplyr", "ggplot2")) 
+ 
+library(haven)    # para leer archivos 
+library(dplyr)    # para manipular datos
+library(ggplot2)  # para graficar
+ 
+# Cargar la base de la CEP
+cep <- read_sav("Encuesta CEP 81 Sep-Oct 2017 v1.sav")
+```
+
+```{r}
+# Mirar dimensiones 
+#(filas = personas encuestadas, columnas = variables)
+dim(cep)
+
+```
+
+## Variables a utilizar
+
+De las cientos de variables que tiene la CEP, pero nos concentramos en cuatro
+
+| **Variable** | **Qué mide** | **Pregunta / codificación** |
+|------------------------|------------------------|------------------------|
+| EDAD_REC | Edad del/la entrevistado/a en años | Variable numérica en tramos |
+| SEXO | Sexo del/la entrevistado/a | 1 = Hombre, 2 = Mujer |
+| DPP_11 | Posición política en escala izquierda-derecha | De 0 (izquierda) a 10 (derecha). |
+| MEP_4 | Intención de voto para presidente | Piñera, Guillier, Sánchez, Kast, ME-O, Goic, Artés, Navarro, nulo/blanco, no sabe. |
+
+## Test de Hipótesis
+
+Un test de hipótesis es un procedimiento para decidir, a partir de una muestra, si una afirmación sobre la población es plausible o no. Siempre hay dos hipótesis:
+
+-   **Hipótesis nula (H₀):** la afirmación "por defecto" o "de no diferencia". Es la que vamos a someter a prueba.
+
+-   **Hipótesis alternativa (H₁):** la afirmación que queremos respaldar con los datos.
+
+El test calcula un estadístico (un número) a partir de la muestra y de él se deriva un p-valor, que es la probabilidad de observar un resultado tan extremo como el nuestro si H₀ fuera verdadera.
+
+::: {.callout-important collapse="true"}
+## Regla de decisión con p-valor
+
+Fijamos un nivel de significancia α (típicamente 0.05 o 5%).
+
+Si p-valor \< α: rechazamos H₀. Los datos son poco compatibles con H₀.
+
+Si p-valor ≥ α: no rechazamos H₀. Los datos son compatibles con H₀.
+
+**"No rechazar" no es lo mismo que "probar que H₀ es verdadera". Simplemente significa que no tenemos evidencia suficiente en contra**
+:::
+
+## Test de hipótesis para una media
+
+Queremos testear si la media de una variable numérica en la población es igual a cierto valor μ₀ que conocemos o que nos propone la teoría.
+
+**El estadístico t**
+
+Cuando la desviación estándar poblacional es desconocida (lo habitual), usamos el estadístico t:
+
+t = (x̄ − μ₀) / (s / √n)
+
+donde x̄ es la media muestral, s la desviación estándar muestral y n el tamaño de la muestra.
+
+Bajo H₀, este estadístico se distribuye t de Student con n−1 grados de libertad.
+
+## Aplicación en R
+
+**¿La posición politica de la media de los encuestados en la CEP es de 7 ?**
+
+Planteamos las hipótesis:
+
+H₀: μ = 7 vs. H₁: μ ≠ 7
+
+```{r}
+# Primero miramos la variable edad
+summary(cep$DPP_11_REC)
+ 
+# Media, desviación estándar y n (quitando NA)
+mean(cep$DPP_11_REC, na.rm = TRUE)
+sd(cep$DPP_11_REC, na.rm = TRUE)
+sum(!is.na(cep$DPP_11_REC))
+ 
+# Test t de una muestra, comparando contra mu = 45
+t.test(cep$DPP_11_REC, mu = 7, alternative = "two.sided", conf.level = 0.95)
+
+```
+
+### Comó leer el resultado
+
+-   Estadístico t = −25.00: nuestra media muestral está 25 errores estándar por debajo del valor hipotético. El signo negativo indica que la media observada (4.73) es menor que el valor testeado (7).
+
+-   p-valor \< 2.2 × 10⁻¹⁶: muchísimo menor que 0.05 (es el valor más pequeño que R puede reportar, prácticamente cero).
+
+-   Intervalo de confianza del 95%: \[4.55, 4.91\]. El valor 7 NO está dentro (de hecho, queda muy lejos).
+
+**Esto es consistente con rechazar H₀**
+
+-   Decisión: rechazamos H₀ por lo tanto, la autoubicación ideológica promedio de los encuestados en la CEP 2017 es significativamente distinta de 7, y de hecho se ubica unpoco más a la izquierda
+
+4.73 en una escala de 0 a 10
+
+## Test de hipótesis para una proporción
+
+Cuando la variable de interés es dicotómica (éxito/fracaso, sí/no, voté/no voté), no tiene sentido hablar de media sino de proporción de "éxitos"
+
+El test es análogo al de media, pero usa el estadístico z:
+
+z = (p̂ − p₀) / √( p₀(1−p₀) / n )
+
+donde p̂ es la proporción muestral y p₀ la proporción hipotética bajo H₀
+
+## Aplicación en R
+
+¿La intención de voto por Piñera en la CEP era compatible con un 40%, o era significativamente mayor?
+
+H₀: p = 0.40 vs. H₁: p \> 0.40
+
+```{r}
+ 
+# Primero, una tabla de frecuencias absolutas
+table(cep$MEP_4)
+ 
+# Construimos una variable dicotómica: vota por Piñera (1) vs. no (0)
+# Usamos as_factor para trabajar con las etiquetas de SPSS
+cep <- cep %>%
+  mutate(voto_pinera = if_else(as_factor(MEP_4) == "Sebastián Piñera", 1, 0))
+
+table(cep$voto_pinera, useNA = "ifany")
+
+# Contamos éxitos y total válidos
+si <- sum(cep$voto_pinera, na.rm = TRUE)
+validos <- sum(!is.na(cep$voto_pinera))
+ 
+si
+validos
+si / validos   # proporción observada
+ 
+# Test de proporción (unilateral)
+prop.test(x = si, n = validos, p = 0.40,
+          alternative = "greater", conf.level = 0.95, correct = FALSE)
+
+```
+
+### Comó leer el resultados
+
+-   Proporción observada = 0.334 (es decir, el 33.4% de quienes declararon intención de voto válida mencionaron a Piñera)
+
+-   Estadístico X² = 25.64 la proporción observada está por debajo del valor hipotético, no por encima
+
+-   p-valor = 1: muchísimo mayor que 0.05,
+
+**Esto es consistente con NO rechazar H₀**
+
+PORQUE NO RECHAZAMOS H₀?
+
+El test unilateral derecho solo mira hacia un lado, solo rechaza si la proporción observada está arriba de 0.40
+
+Nuestra proporción observada fue 0.334 (33.4%), que está por debajo de 0.40, entonces el test se pregunta:
+
+¿Hay evidencia de que x \> 0.40?" Y la respuesta es , al contrario, los datos muestran que x parece ser MENOR a 0.40.
+
+## Test de Chi-cuadrado de independencia
+
+Hasta ahora testeamos parámetros de una sola variable
+
+El test de Chi-cuadrado de independencia sirve para algo distinto, **ver si dos variables categóricas están relacionadas entre sí en la población**
+
+### ¿Comó funcionan los text de hipótesis en chi-cuadrado?
+
+H₀: las dos variables son independientes
+
+H₁: las dos variables NO son independientes (están asociadas)
+
+### El estadistico
+
+Comparamos las frecuencias observadas (O) con las frecuencias esperadas bajo independencia (E)
+
+χ² = Σ (O − E)² / E
+
+Las frecuencias esperadas se calculan como Eᵢⱼ = (total fila i × total columna j) / N. Bajo H₀ el estadístico se distribuye χ² con (f − 1)(c − 1) grados de libertad, donde f y c son el número de filas y columnas de la tabla
+
+::: {.callout-important collapse="true"}
+### Supuestos importantes
+
+-   La muestra debe ser aleatoria.
+
+-   Las observaciones deben ser independientes entre sí.
+:::
+
+## Aplicación en R
+
+En la literatura comparada existe evidencia de un "gender gap" en la política (las mujeres tenderían a posicionarse distinto de los hombres en la escala ideológica)
+
+**¿Ese patrón se observa en Chile según la CEP 2017?**
+
+Para aplicar Chi-cuadrado necesitamos dos variables categóricas
+
+Sexo ya es categórica
+
+La escala 0-10 la vamos a recodificar en tres bloques: izquierda (0-4), centro (5), derecha (6-10).
+
+```{r}
+# Recodificación de la escala izquierda-derecha
+
+# Los valores 11 y 12 (no sabe / no contesta) se convierten en NA.
+
+cep <- cep %>%
+  mutate(
+    esc_rec = case_when(
+      DPP_11 >= 1 & DPP_11 <= 4  ~ "Izquierda",
+      DPP_11 == 5 ~ "Centro",
+      DPP_11 >= 6 & DPP_11 <= 10 ~ "Derecha",
+      TRUE~ NA_character_),
+    esc_rec = factor(esc_rec, levels = c("Izquierda", "Centro", "Derecha")),
+    SEXO = as_factor(SEXO))
+ 
+# Tabla de contingencia (frecuencias observadas)
+tabla <- table(cep$SEXO, cep$esc_rec)
+tabla
+ 
+# Tabla con porcentajes por fila (para interpretar)
+round( prop.table(tabla, margin = 1) * 100 , 1 )
+ 
+# Test de Chi-cuadrado
+chi <- chisq.test(tabla)
+chi
+ 
+
+
+```
+
+### Comó leer el resultado
+
+-   Estadístico χ² = 1.50, con 2 grados de libertad.
+
+-   p-valor = 0.472 muchísimo mayor que 0.05.
+
+**NO RECHAZAMOS H₀**
+
+No hay evidencia estadísticamente significativa, de que el sexo y la autoubicación ideológica estén asociados en la CEP 2017
+
+El estadístico χ² = 1.50 es un número muy chico lo que significa que lo que vimos en la muestra se parece muchísimo a lo que esperaríamos si hombres y mujeres tuvieran las mismas preferencias ideológicas
+
+El p-valor de 0.472 refuerza esto nos dice que hay un 47% de probabilidad de obtener diferencias como las que vimos solo por azar, aunque en realidad no exista ninguna relación.
+
+**Con esa probabilidad tan alta de que sea puro azar, no podemos afirmar que exista una relación real**
+
+## [<strong> Ejercicios </strong>]{style="color:#FF82AB;"}
+
+Estos ejercicios los pueden resolver con la misma base CEP **Recuerden hacerlos hacerlos en un script de R separado y comentar cada paso**
+
+### Ejercicio 1 — Test de media
+
+Un analista político afirma que "el chileno promedio se ubica en el centro del espectro ideológico", es decir, que la media de pond_esc es igual a 5
+
+**Testeen esa afirmación con α = 0.05**
+
+Usen `t.test()` con `alternative = "two.sided"`
+
+Reporten t, grados de libertad, p-valor e intervalo de confianza
+
+**¿Rechazan H₀?**
+
+### Ejercicio 2 — Test de proporción
+
+\*\* ¿qué porcentaje de la muestra aprueba la gestión de la presidenta Bachelet ?**(buscar nombre de variable en libro de codigos)**
+
+Testeen si esa proporción es significativamente menor al 30%
+
+Recuerden que este test es unilateral izquierda `(alternative = "less")`
+
+Reporten la proporción observada, el p-valor y la decisión
+
+### Ejercicio 3 — Chi-cuadrado
+
+**Construyan una tabla de contingencia entre sexo e intención de voto**
+
+Testeen si ambas variables están asociadas.
+
+Reporten χ², grados de libertad, p-valor e interpreten
+
+### Ejercicio 4 — Reflexión
+
+En los tres ejercicios anteriores identificamos un p-valor
+
+Conversen o respondan, en no más de 5 líneas
+
+-   **¿Qué significa exactamente un p-valor pequeño?**
+
+-   **¿Por qué rechazar H₀ NO equivale a haber demostrado H₁ con certeza?**
+
+## Resumen
+
+| **Situación** | **Hipótesis nula** | **Función en R** | **Supuesto clave** |
+|----|----|----|----|
+| Testear una media | μ = μ₀ | t.test(x, mu = μ₀) | Variable aprox. normal o n grande |
+| Testear una proporción | p = p₀ | prop.test(x, n, p = p₀) | np₀ ≥ 5 y n(1−p₀) ≥ 5 |
+| Asociación entre 2 var. categóricas | Independencia | chisq.test(tabla) | Todas las Eᵢⱼ ≥ 5 (idealmente) |
+
+
+---
+
+## [<strong> Autoría y fuentes </strong>]{style="color:#FF82AB;"}
+
+Este material fue elaborado por <strong>Francisca Hernández</strong> 
+(<a href="mailto:franhc123@gmail.cl">franhc123@gmail.cl</a>),
+utilizando desarrollo propio en base a los contenidos del curso. Asimismo, se incorporaron elementos provenientes de recursos complementarios disponibles en internet.
